@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "@/context/AuthContext";
 import { GuestBanner } from "@/components/GuestBanner";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -64,6 +65,7 @@ export default function RootLayout({
             {children}
           </main>
           <Footer />
+          <WhatsAppButton />
         </AuthProvider>
         <Toaster
           position="top-right"

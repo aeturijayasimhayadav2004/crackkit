@@ -63,6 +63,14 @@ export function Footer() {
           </div>
         </div>
 
+        {/* Razorpay trust badge */}
+        <div className="flex items-center justify-center gap-2 mb-6">
+          <span className="text-xs text-text-secondary">Payments secured by</span>
+          <span className="text-xs font-bold text-white bg-[#3395FF] px-2 py-0.5 rounded">
+            Razorpay
+          </span>
+        </div>
+
         {/* Bottom */}
         <div className="text-center text-sm text-text-secondary">
           <p>© {currentYear} CrackKit. All rights reserved. Made in India 🇮🇳</p>
