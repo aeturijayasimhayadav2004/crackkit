@@ -51,8 +51,10 @@ export async function proxy(request: NextRequest) {
   return supabaseResponse
 }
 
+// Only run on routes that actually need a verified session. Public/cacheable
+// pages (home, products, etc.) skip the per-request Supabase Auth round-trip,
+// which keeps the site fast and cheap under heavy traffic. API routes do their
+// own auth checks internally.
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/dashboard/:path*'],
 }

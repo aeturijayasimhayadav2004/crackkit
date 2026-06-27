@@ -11,13 +11,17 @@ export async function POST(req: Request) {
     .update(rawBody)
     .digest('hex')
 
-  if (expectedSig !== receivedSig) {
+  const sigOk =
+    expectedSig.length === receivedSig.length &&
+    crypto.timingSafeEqual(Buffer.from(expectedSig), Buffer.from(receivedSig))
+
+  if (!sigOk) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
   const body = JSON.parse(rawBody) as {
     event: string
-    payload: { payment: { entity: { id: string; order_id: string } } }
+    payload: { payment: { entity: { id: string; order_id: string; amount: number } } }
   }
 
   if (body.event === 'payment.captured') {
@@ -31,12 +35,19 @@ export async function POST(req: Request) {
 
     const { data: order } = await supabaseAdmin
       .from('orders')
-      .select('id, user_id')
+      .select('id, user_id, amount_inr')
       .eq('razorpay_order_id', razorpayOrderId)
       .single()
 
     if (!order) {
-      return NextResponse.json({ error: 'Order not found' }, { status: 404 })
+      // 200 so Razorpay stops retrying an order we don't recognise
+      return NextResponse.json({ received: true }, { status: 200 })
+    }
+
+    // Guard against amount tampering — paid amount must match what we charged
+    const ord0 = order as { id: string; user_id: string; amount_inr: number }
+    if (payment.amount !== ord0.amount_inr) {
+      return NextResponse.json({ received: true }, { status: 200 })
     }
 
     await supabaseAdmin
@@ -46,19 +57,19 @@ export async function POST(req: Request) {
         razorpay_payment_id: payment.id,
         razorpay_signature: receivedSig,
       })
-      .eq('id', (order as { id: string; user_id: string }).id)
+      .eq('id', ord0.id)
 
     const { data: items } = await supabaseAdmin
       .from('order_items')
       .select('product_id')
-      .eq('order_id', (order as { id: string; user_id: string }).id)
+      .eq('order_id', ord0.id)
 
     for (const item of (items ?? []) as { product_id: string }[]) {
       await supabaseAdmin.from('purchases').upsert(
         {
-          user_id: (order as { id: string; user_id: string }).user_id,
+          user_id: ord0.user_id,
           product_id: item.product_id,
-          order_id: (order as { id: string; user_id: string }).id,
+          order_id: ord0.id,
         },
         { onConflict: 'user_id,product_id', ignoreDuplicates: true }
       )

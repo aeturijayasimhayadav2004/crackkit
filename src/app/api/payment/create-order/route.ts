@@ -5,7 +5,7 @@ import Razorpay from 'razorpay'
 import { z } from 'zod'
 
 const schema = z.object({
-  productIds: z.array(z.string().uuid()).min(1),
+  productIds: z.array(z.string().uuid()).min(1).max(50),
 })
 
 export async function POST(req: Request) {
