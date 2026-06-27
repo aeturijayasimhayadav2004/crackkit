@@ -6,9 +6,12 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import { Lock, Loader2 } from 'lucide-react';
 
+type PaymentMethod = 'all' | 'upi' | 'card' | 'netbanking';
+
 interface RazorpayCheckoutProps {
   productIds: string[];
   totalAmount: number;
+  paymentMethod?: PaymentMethod;
 }
 
 interface RazorpayResponse {
@@ -23,7 +26,7 @@ declare global {
   }
 }
 
-export function RazorpayCheckout({ productIds, totalAmount }: RazorpayCheckoutProps) {
+export function RazorpayCheckout({ productIds, totalAmount, paymentMethod = 'all' }: RazorpayCheckoutProps) {
   const router = useRouter();
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -88,6 +91,15 @@ export function RazorpayCheckout({ productIds, totalAmount }: RazorpayCheckoutPr
 
       const { razorpayOrderId, amount } = await res.json();
 
+      const methodConfig: Record<string, boolean> =
+        paymentMethod === 'upi'
+          ? { upi: true }
+          : paymentMethod === 'card'
+          ? { card: true }
+          : paymentMethod === 'netbanking'
+          ? { netbanking: true }
+          : { upi: true, card: true, netbanking: true, wallet: true };
+
       const options = {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount,
@@ -101,6 +113,7 @@ export function RazorpayCheckout({ productIds, totalAmount }: RazorpayCheckoutPr
           email: user.email ?? '',
         },
         theme: { color: '#6C5CE7' },
+        method: methodConfig,
         modal: {
           ondismiss: () => {
             toast.error('Payment cancelled');
@@ -121,11 +134,17 @@ export function RazorpayCheckout({ productIds, totalAmount }: RazorpayCheckoutPr
     }
   };
 
+  const methodLabel =
+    paymentMethod === 'upi'
+      ? 'Pay via UPI'
+      : paymentMethod === 'card'
+      ? 'Pay via Card'
+      : paymentMethod === 'netbanking'
+      ? 'Pay via Netbanking'
+      : 'Pay Now';
+
   return (
     <div className="space-y-4">
-      <p className="text-center text-sm text-primary font-semibold">
-        Pay via UPI — fastest for Indian users
-      </p>
       <button
         onClick={handlePayment}
         disabled={loading}
@@ -139,7 +158,7 @@ export function RazorpayCheckout({ productIds, totalAmount }: RazorpayCheckoutPr
         ) : (
           <>
             <Lock className="w-5 h-5" />
-            Pay ₹{totalAmount.toLocaleString('en-IN')} with Razorpay
+            {methodLabel} — ₹{totalAmount.toLocaleString('en-IN')}
           </>
         )}
       </button>

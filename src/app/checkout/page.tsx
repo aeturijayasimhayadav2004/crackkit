@@ -1,19 +1,28 @@
 "use client";
 
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import { PageTransition } from "@/components/PageTransition";
 import { RazorpayCheckout } from "@/components/RazorpayCheckout";
 import { useCartStore } from "@/store/cartStore";
 import { formatPrice } from "@/lib/utils";
 import { Zap, ArrowLeft, Smartphone, CreditCard, Building2, Lock } from "lucide-react";
 
+type PaymentMethod = 'all' | 'upi' | 'card' | 'netbanking';
+
+const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: React.ReactNode; color: string }[] = [
+  { id: 'upi', label: 'UPI / PhonePe / GPay', icon: <Smartphone className="w-4 h-4" />, color: '#5F259F' },
+  { id: 'card', label: 'Credit / Debit Card', icon: <CreditCard className="w-4 h-4" />, color: '#6C5CE7' },
+  { id: 'netbanking', label: 'Net Banking', icon: <Building2 className="w-4 h-4" />, color: '#00B4D8' },
+];
+
 export default function CheckoutPage() {
   const router = useRouter();
   const items = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.totalPrice());
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('upi');
 
   useEffect(() => {
     if (items.length === 0) {
@@ -103,30 +112,35 @@ export default function CheckoutPage() {
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
-                <div className="bg-background border border-border px-3 py-2 rounded-md flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-text-secondary" />
-                  <span className="text-xs font-bold text-white">UPI</span>
-                </div>
-                <div className="bg-background border border-border px-3 py-2 rounded-md flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-[#5F259F]" />
-                  <span className="text-xs font-bold text-white">PhonePe</span>
-                </div>
-                <div className="bg-background border border-border px-3 py-2 rounded-md flex items-center gap-2">
-                  <Smartphone className="w-4 h-4 text-[#00875A]" />
-                  <span className="text-xs font-bold text-white">GPay</span>
-                </div>
-                <div className="bg-background border border-border px-3 py-2 rounded-md flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-text-secondary" />
-                  <span className="text-xs font-bold text-white">Cards</span>
-                </div>
-                <div className="bg-background border border-border px-3 py-2 rounded-md flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-text-secondary" />
-                  <span className="text-xs font-bold text-white">Netbanking</span>
+              <div className="mb-6">
+                <p className="text-xs text-text-secondary text-center mb-3 uppercase tracking-widest font-semibold">
+                  Choose Payment Method
+                </p>
+                <div className="flex flex-col gap-2">
+                  {PAYMENT_METHODS.map((m) => {
+                    const isSelected = selectedMethod === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        onClick={() => setSelectedMethod(m.id)}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all text-left ${
+                          isSelected
+                            ? 'border-primary bg-primary/10 text-white'
+                            : 'border-border bg-background text-text-secondary hover:border-primary/50 hover:text-white'
+                        }`}
+                      >
+                        <span style={{ color: isSelected ? m.color : undefined }}>{m.icon}</span>
+                        <span className="text-sm font-semibold">{m.label}</span>
+                        {isSelected && (
+                          <span className="ml-auto w-2 h-2 rounded-full bg-primary" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              <RazorpayCheckout productIds={productIds} totalAmount={totalPrice} />
+              <RazorpayCheckout productIds={productIds} totalAmount={totalPrice} paymentMethod={selectedMethod} />
 
               <div className="flex items-center justify-center gap-2 mt-4 mb-6">
                 <Lock className="w-3.5 h-3.5 text-text-secondary" />
