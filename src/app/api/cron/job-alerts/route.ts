@@ -15,12 +15,15 @@ type Subscription = {
 }
 
 export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+
+  // Vercel strips Authorization headers — use query param or header fallback
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.JOB_AGENT_SECRET}`) {
+  const authParam = searchParams.get('secret')
+  const secret = process.env.JOB_AGENT_SECRET
+  if (authHeader !== `Bearer ${secret}` && authParam !== secret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-
-  const { searchParams } = new URL(req.url)
   const dryRun = searchParams.get('dry_run') === '1'
 
   if (!dryRun && !process.env.RESEND_API_KEY) {
