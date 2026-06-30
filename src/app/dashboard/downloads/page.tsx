@@ -6,7 +6,7 @@ import { DownloadButton } from "@/components/DownloadButton";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/admin";
 import { getProducts, getUserPurchases } from "@/lib/supabase/queries";
-import { Calendar, FileText, Package } from "lucide-react";
+import { Calendar, FileText, Package, CheckCircle2, Mail } from "lucide-react";
 import { formatDate, formatPrice } from "@/lib/utils";
 
 type ProductFile = {
@@ -127,16 +127,25 @@ export default async function DownloadsPage() {
                         )}
                       </div>
 
-                      {hasMultipleFiles ? (
+                      {product.slug === 'job-alert-agent' ? (
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+                            <span className="text-green-400 font-semibold text-sm">Agent Activated</span>
+                          </div>
+                          <div className="flex items-start gap-2 text-text-secondary text-sm">
+                            <Mail className="w-4 h-4 flex-shrink-0 mt-0.5 text-primary" />
+                            <span>You will receive emails with fresh Indian job openings at <span className="text-white font-medium">8:00 AM every morning</span>. Jobs are auto-curated from LinkedIn and Internshala based on your selected domains.</span>
+                          </div>
+                        </div>
+                      ) : hasMultipleFiles ? (
                         <div className="flex flex-col gap-2">
-                          {/* Primary file */}
                           <DownloadButton
                             productId={product.id}
                             productTitle={product.title}
                             isPurchased={true}
                             label="Primary PDF"
                           />
-                          {/* Additional files */}
                           {extraFiles.map((file) => (
                             <DownloadButton
                               key={file.id}
