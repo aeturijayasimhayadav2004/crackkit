@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url)
+  const testSecret = searchParams.get('s')
+
+  const stored = process.env.JOB_AGENT_SECRET ?? ''
+  const matches = testSecret !== null ? testSecret === stored : null
+
   return NextResponse.json({
-    has_job_agent_secret: !!process.env.JOB_AGENT_SECRET,
-    has_cron_secret: !!process.env.CRON_SECRET,
-    has_resend_key: !!process.env.RESEND_API_KEY,
-    node_env: process.env.NODE_ENV,
+    has_job_agent_secret: !!stored,
+    matches: matches,
   })
 }
