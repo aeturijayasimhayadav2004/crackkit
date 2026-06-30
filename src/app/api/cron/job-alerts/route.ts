@@ -16,7 +16,7 @@ type Subscription = {
 
 export async function GET(req: Request) {
   const authHeader = req.headers.get('authorization')
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (authHeader !== `Bearer ${process.env.JOB_AGENT_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -86,7 +86,7 @@ export async function GET(req: Request) {
 
       const unsubToken = crypto
         .createHash('sha256')
-        .update(sub.user_id + (process.env.CRON_SECRET ?? ''))
+        .update(sub.user_id + (process.env.JOB_AGENT_SECRET ?? ''))
         .digest('hex')
         .slice(0, 32)
 

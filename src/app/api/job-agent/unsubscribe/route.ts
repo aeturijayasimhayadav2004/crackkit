@@ -17,7 +17,7 @@ export async function GET(req: Request) {
 
   const expected = crypto
     .createHash('sha256')
-    .update(uid + (process.env.CRON_SECRET ?? ''))
+    .update(uid + (process.env.JOB_AGENT_SECRET ?? ''))
     .digest('hex')
     .slice(0, 32)
 
