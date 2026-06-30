@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ProductCard } from "@/components/ProductCard";
 import { type Product } from "@/data/mockProducts";
-import { Search, SlidersHorizontal } from "lucide-react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
 
 const CATEGORIES = [
   "All",
@@ -23,6 +23,7 @@ export function ProductsClient({ initialProducts }: ProductsClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
+  const [showFilters, setShowFilters] = useState(false);
 
   let filtered = initialProducts.filter((p) => {
     const matchesSearch =
@@ -45,10 +46,40 @@ export function ProductsClient({ initialProducts }: ProductsClientProps) {
     });
   }
 
+  const activeFilterCount =
+    (searchQuery ? 1 : 0) +
+    (selectedCategory !== "All" ? 1 : 0) +
+    (sortBy !== "newest" ? 1 : 0);
+
   return (
     <div className="flex flex-col lg:flex-row gap-8">
+      {/* Mobile filter toggle — hidden on desktop */}
+      <div className="flex lg:hidden items-center gap-3 mb-2">
+        <button
+          onClick={() => setShowFilters((v) => !v)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-border bg-surface text-text-secondary hover:text-white transition-colors text-sm font-semibold"
+        >
+          <SlidersHorizontal className="w-4 h-4" />
+          Filters
+          {activeFilterCount > 0 && (
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-primary text-white text-[10px] font-bold">
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+        {showFilters && (
+          <button
+            onClick={() => setShowFilters(false)}
+            className="p-2 text-text-secondary hover:text-white transition-colors"
+            aria-label="Close filters"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* Sidebar */}
-      <div className="w-full lg:w-1/4 flex flex-col gap-6">
+      <div className={`w-full lg:w-1/4 flex-col gap-6 ${showFilters ? "flex" : "hidden"} lg:flex`}>
         <div className="bg-surface border border-border rounded-xl p-5">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4 text-primary" /> Filters

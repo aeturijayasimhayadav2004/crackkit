@@ -8,6 +8,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { useCartStore } from "@/store/cartStore";
 import { formatPrice } from "@/lib/utils";
 import { Trash2, ArrowRight, Shield, Zap, RefreshCcw } from "lucide-react";
+import { CheckoutProgress } from "@/components/CheckoutProgress";
 
 export default function CartPage() {
   const router = useRouter();
@@ -24,11 +25,12 @@ export default function CartPage() {
     return (
       <PageTransition>
         <div className="container mx-auto px-4 py-20 min-h-[60vh] flex items-center justify-center">
-          <EmptyState 
-            title="Your cart is empty" 
+          <EmptyState
+            title="Your cart is empty"
             subtitle="Looks like you haven't added any study materials yet. Explore our premium bundles."
             ctaText="Browse Products"
             ctaHref="/products"
+            variant="cart"
           />
         </div>
       </PageTransition>
@@ -38,6 +40,7 @@ export default function CartPage() {
   return (
     <PageTransition>
       <div className="container mx-auto px-4 py-12 min-h-[70vh]">
+        <CheckoutProgress step={1} />
         <h1 className="text-4xl font-bold font-syne text-white mb-8">Your Cart</h1>
         
         <div className="flex flex-col lg:flex-row gap-8">
@@ -85,7 +88,7 @@ export default function CartPage() {
               
               <div className="border-t border-border pt-4 mb-8 flex justify-between items-end">
                 <span className="text-lg font-bold text-white">Total</span>
-                <span className="text-3xl font-bold font-mono text-white">{formatPrice(totalPrice)}</span>
+                <span className="text-2xl sm:text-3xl font-bold font-mono text-white">{formatPrice(totalPrice)}</span>
               </div>
               
               <button 

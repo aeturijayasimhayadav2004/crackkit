@@ -1,10 +1,15 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { CheckCircle } from 'lucide-react';
+import { CheckoutProgress } from '@/components/CheckoutProgress';
+import { JobAgentSetupCard } from '@/components/JobAgentSetupCard';
+import { type DomainKey } from '@/lib/job-domains';
 
 export default function CheckoutSuccessPage() {
+  const [agentDomains, setAgentDomains] = useState<DomainKey[] | null>(null);
+
   useEffect(() => {
     void import('canvas-confetti').then(({ default: confetti }) => {
       confetti({
@@ -13,10 +18,26 @@ export default function CheckoutSuccessPage() {
         origin: { y: 0.5 },
       });
     });
+
+    // Check if user purchased the job agent and has pending domain config
+    try {
+      const raw = localStorage.getItem('crackkit_agent_domains');
+      if (raw) {
+        const parsed = JSON.parse(raw) as DomainKey[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAgentDomains(parsed);
+        }
+      }
+    } catch {
+      // ignore malformed localStorage value
+    }
   }, []);
 
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center px-4 text-center">
+      <div className="w-full max-w-md mb-2">
+        <CheckoutProgress step={3} />
+      </div>
       <div className="mb-6 text-success">
         <CheckCircle className="w-20 h-20 mx-auto" />
       </div>
@@ -57,6 +78,14 @@ export default function CheckoutSuccessPage() {
         </svg>
         Share CrackKit with friends on WhatsApp
       </a>
+
+      {/* Job Agent Setup — shows only when the agent was purchased */}
+      {agentDomains && (
+        <JobAgentSetupCard
+          initialDomains={agentDomains}
+          onComplete={() => setAgentDomains(null)}
+        />
+      )}
     </div>
   );
 }

@@ -4,9 +4,19 @@ import { redirect } from "next/navigation";
 import { PageTransition } from "@/components/PageTransition";
 import { DownloadButton } from "@/components/DownloadButton";
 import { createClient } from "@/lib/supabase/server";
+import { supabaseAdmin } from "@/lib/admin";
 import { getProducts, getUserPurchases } from "@/lib/supabase/queries";
 import { Calendar, FileText, Package } from "lucide-react";
 import { formatDate, formatPrice } from "@/lib/utils";
+
+type ProductFile = {
+  id: string;
+  product_id: string;
+  file_path: string;
+  display_name: string;
+  file_size_mb: number | null;
+  sort_order: number;
+};
 
 export default async function DownloadsPage() {
   const supabase = await createClient();
@@ -26,6 +36,23 @@ export default async function DownloadsPage() {
   const purchasedSet = new Set(purchasedIds);
   const purchasedProducts = allProducts.filter((p) => purchasedSet.has(p.id));
   const unpurchasedProducts = allProducts.filter((p) => !purchasedSet.has(p.id));
+
+  // Fetch additional files for purchased products
+  let filesByProduct = new Map<string, ProductFile[]>();
+  if (purchasedIds.length > 0) {
+    const admin = supabaseAdmin();
+    const { data: productFiles } = await admin
+      .from("product_files")
+      .select("*")
+      .in("product_id", purchasedIds)
+      .order("sort_order", { ascending: true });
+
+    for (const file of (productFiles ?? []) as ProductFile[]) {
+      const list = filesByProduct.get(file.product_id) ?? [];
+      list.push(file);
+      filesByProduct.set(file.product_id, list);
+    }
+  }
 
   return (
     <PageTransition>
@@ -53,48 +80,85 @@ export default async function DownloadsPage() {
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {purchasedProducts.map((product) => (
-                <div
-                  key={product.id}
-                  className="bg-surface border border-primary/30 rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-start sm:items-center relative overflow-hidden group"
-                >
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-bl-full -z-10 transition-transform group-hover:scale-110" />
+            <div className="grid grid-cols-1 gap-6">
+              {purchasedProducts.map((product) => {
+                const extraFiles = filesByProduct.get(product.id) ?? [];
+                const hasMultipleFiles = extraFiles.length > 0;
 
-                  <div className="relative w-24 h-24 sm:w-32 sm:h-32 rounded-xl overflow-hidden bg-background flex-shrink-0 shadow-lg">
-                    <Image
-                      src={product.coverImage}
-                      alt={product.title}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
+                return (
+                  <div
+                    key={product.id}
+                    className="bg-surface border border-primary/30 rounded-2xl p-6 flex flex-col sm:flex-row gap-6 items-start relative overflow-hidden group"
+                  >
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-bl-full -z-10 transition-transform group-hover:scale-110" />
 
-                  <div className="flex flex-col flex-grow w-full">
-                    <span className="text-xs font-bold text-primary mb-2 uppercase tracking-wider">
-                      {product.category}
-                    </span>
-                    <h3 className="text-xl font-bold text-white mb-3 line-clamp-1">
-                      {product.title}
-                    </h3>
-                    <div className="flex items-center gap-4 text-xs text-text-secondary mb-6">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {formatDate(new Date().toISOString())}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <FileText className="w-3.5 h-3.5" />
-                        {product.pages} Pages
-                      </span>
+                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-background flex-shrink-0 shadow-lg">
+                      <Image
+                        src={product.coverImage}
+                        alt={product.title}
+                        fill
+                        className="object-cover"
+                      />
                     </div>
-                    <DownloadButton
-                      productId={product.id}
-                      productTitle={product.title}
-                      isPurchased={true}
-                    />
+
+                    <div className="flex flex-col flex-grow w-full min-w-0">
+                      <span className="text-xs font-bold text-primary mb-2 uppercase tracking-wider">
+                        {product.category}
+                      </span>
+                      <h3 className="text-xl font-bold text-white mb-3 line-clamp-1">
+                        {product.title}
+                      </h3>
+                      <div className="flex items-center gap-4 text-xs text-text-secondary mb-5">
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {formatDate(new Date().toISOString())}
+                        </span>
+                        {product.pages && (
+                          <span className="flex items-center gap-1">
+                            <FileText className="w-3.5 h-3.5" />
+                            {product.pages} Pages
+                          </span>
+                        )}
+                        {hasMultipleFiles && (
+                          <span className="flex items-center gap-1 text-primary">
+                            <Package className="w-3.5 h-3.5" />
+                            {extraFiles.length + 1} files included
+                          </span>
+                        )}
+                      </div>
+
+                      {hasMultipleFiles ? (
+                        <div className="flex flex-col gap-2">
+                          {/* Primary file */}
+                          <DownloadButton
+                            productId={product.id}
+                            productTitle={product.title}
+                            isPurchased={true}
+                            label="Primary PDF"
+                          />
+                          {/* Additional files */}
+                          {extraFiles.map((file) => (
+                            <DownloadButton
+                              key={file.id}
+                              productId={product.id}
+                              productTitle={file.display_name}
+                              isPurchased={true}
+                              fileId={file.id}
+                              label={file.display_name}
+                            />
+                          ))}
+                        </div>
+                      ) : (
+                        <DownloadButton
+                          productId={product.id}
+                          productTitle={product.title}
+                          isPurchased={true}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

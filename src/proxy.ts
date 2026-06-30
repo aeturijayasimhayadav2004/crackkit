@@ -48,6 +48,23 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  // Protect /admin/* — only the ADMIN_EMAIL account may access
+  if (request.nextUrl.pathname.startsWith('/admin')) {
+    if (!user) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/auth/login'
+      url.searchParams.set('redirect', request.nextUrl.pathname)
+      return NextResponse.redirect(url)
+    }
+    const adminEmail = process.env.ADMIN_EMAIL
+    if (!adminEmail || user.email !== adminEmail) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
+  }
+
   return supabaseResponse
 }
 
@@ -56,5 +73,5 @@ export async function proxy(request: NextRequest) {
 // which keeps the site fast and cheap under heavy traffic. API routes do their
 // own auth checks internally.
 export const config = {
-  matcher: ['/dashboard/:path*'],
+  matcher: ['/dashboard/:path*', '/admin/:path*'],
 }

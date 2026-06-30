@@ -12,6 +12,7 @@ interface RazorpayCheckoutProps {
   productIds: string[];
   totalAmount: number;
   paymentMethod?: PaymentMethod;
+  coupon?: string | null;
 }
 
 interface RazorpayResponse {
@@ -26,7 +27,7 @@ declare global {
   }
 }
 
-export function RazorpayCheckout({ productIds, totalAmount, paymentMethod = 'all' }: RazorpayCheckoutProps) {
+export function RazorpayCheckout({ productIds, totalAmount, paymentMethod = 'all', coupon = null }: RazorpayCheckoutProps) {
   const router = useRouter();
   const { user, profile } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -79,7 +80,7 @@ export function RazorpayCheckout({ productIds, totalAmount, paymentMethod = 'all
       const res = await fetch('/api/payment/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productIds }),
+        body: JSON.stringify({ productIds, coupon: coupon ?? undefined }),
       });
 
       if (!res.ok) {

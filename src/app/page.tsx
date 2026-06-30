@@ -2,6 +2,8 @@ import Link from "next/link";
 import { PageTransition } from "@/components/PageTransition";
 import { HomeProductsSection } from "./_components/HomeProductsSection";
 import { HomeFaqSection } from "./_components/HomeFaqSection";
+import { FreeGuideSection } from "@/components/FreeGuideSection";
+import { RoadmapSection } from "@/components/RoadmapSection";
 import { getProducts } from "@/lib/supabase/queries";
 import { ShoppingCart, CreditCard, Zap, Star } from "lucide-react";
 
@@ -11,18 +13,24 @@ export default async function Home() {
   return (
     <PageTransition>
       {/* Section 1: Hero */}
-      <section className="relative pt-24 pb-20 overflow-hidden">
+      <section className="relative pt-14 pb-12 md:pt-24 md:pb-20 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(108,92,231,0.15),transparent_50%)]" />
         <div className="container mx-auto px-4 relative z-10 text-center max-w-4xl">
-          <h1 className="text-4xl md:text-6xl font-bold font-syne text-white mb-6 leading-tight">
-            Crack Every Interview. <br className="hidden md:block" />
-            Master Every Skill.
+          <h1 className="text-4xl md:text-6xl font-bold font-syne mb-6 leading-tight">
+            <span
+              className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-[#a29bfe] to-primary animate-gradient-x"
+              style={{ backgroundSize: "200% 200%" }}
+            >
+              Crack Every Interview.
+            </span>
+            <br className="hidden md:block" />
+            <span className="text-white">Master Every Skill.</span>
           </h1>
           <p className="text-lg md:text-xl text-text-secondary mb-10 max-w-2xl mx-auto">
             Premium study bundles for DSA, Web Dev, System Design & more.
             Instant download. Indian prices.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-16">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-10 md:mb-16">
             <Link
               href="/products"
               className="w-full sm:w-auto bg-primary hover:bg-primary-hover text-white font-semibold py-3 px-8 rounded-lg transition-colors"
@@ -70,7 +78,7 @@ export default async function Home() {
       </section>
 
       {/* Section 2 & 3: Products */}
-      <section className="py-20 bg-background" id="products">
+      <section className="py-12 md:py-20 bg-background" id="products">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold font-syne text-white mb-8">
@@ -90,14 +98,20 @@ export default async function Home() {
         </div>
       </section>
 
+      {/* Section: Prep Roadmaps */}
+      <RoadmapSection />
+
+      {/* Section: Free Guide lead magnet */}
+      <FreeGuideSection />
+
       {/* Section 4: How It Works */}
-      <section className="py-20 bg-surface border-y border-border">
+      <section className="py-12 md:py-20 bg-surface border-y border-border">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold font-syne text-white mb-16">
+          <h2 className="text-3xl font-bold font-syne text-white mb-10 md:mb-16">
             Get your material in 3 steps
           </h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-12 relative max-w-5xl mx-auto">
             <div className="hidden md:block absolute top-1/2 left-1/6 right-1/6 h-[2px] border-t-2 border-dashed border-border -translate-y-1/2 z-0" />
 
             <div className="relative z-10 flex flex-col items-center bg-surface">
@@ -149,9 +163,9 @@ export default async function Home() {
       </section>
 
       {/* Section 5: Testimonials */}
-      <section className="py-20 bg-background">
+      <section className="py-12 md:py-20 bg-background">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold font-syne text-white text-center mb-12">
+          <h2 className="text-3xl font-bold font-syne text-white text-center mb-8 md:mb-12">
             Loved by 6,000+ students across India
           </h2>
 
@@ -211,9 +225,9 @@ export default async function Home() {
       </section>
 
       {/* Section 6: FAQ */}
-      <section className="py-20 bg-background border-t border-border">
+      <section className="py-12 md:py-20 bg-background border-t border-border">
         <div className="container mx-auto px-4 max-w-3xl">
-          <h2 className="text-3xl font-bold font-syne text-white text-center mb-12">
+          <h2 className="text-3xl font-bold font-syne text-white text-center mb-8 md:mb-12">
             Frequently Asked Questions
           </h2>
           <HomeFaqSection />

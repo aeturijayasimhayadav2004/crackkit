@@ -7,8 +7,8 @@ export default async function ProductsPage() {
 
   return (
     <PageTransition>
-      <div className="container mx-auto px-4 py-12">
-        <h1 className="text-4xl font-bold font-syne text-white mb-8">
+      <div className="container mx-auto px-4 py-8 md:py-12">
+        <h1 className="text-3xl md:text-4xl font-bold font-syne text-white mb-6 md:mb-8">
           All Products
         </h1>
         <ProductsClient initialProducts={products} />

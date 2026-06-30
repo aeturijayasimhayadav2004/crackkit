@@ -30,6 +30,9 @@
   --font-mono: var(--font-mono);
 
   --animate-shimmer: shimmer 2s linear infinite;
+  --animate-gradient-x: gradient-x 5s ease infinite;
+  --animate-float: float 3s ease-in-out infinite;
+  --animate-fade-in-up: fade-in-up 0.5s ease forwards;
 }
 
 @keyframes shimmer {
@@ -37,8 +40,31 @@
   100% { transform: translateX(100%); }
 }
 
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 body {
   background-color: var(--background);
   color: var(--text-primary);
   font-family: var(--font-inter), sans-serif;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

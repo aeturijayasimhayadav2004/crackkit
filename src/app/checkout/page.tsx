@@ -8,7 +8,10 @@ import { PageTransition } from "@/components/PageTransition";
 import { RazorpayCheckout } from "@/components/RazorpayCheckout";
 import { useCartStore } from "@/store/cartStore";
 import { formatPrice } from "@/lib/utils";
-import { Zap, ArrowLeft, Smartphone, CreditCard, Building2, Lock } from "lucide-react";
+import { applyWelcomeDiscountRupees } from "@/lib/coupons";
+import toast from "react-hot-toast";
+import { Zap, ArrowLeft, Smartphone, CreditCard, Building2, Lock, Tag, X, Loader2 } from "lucide-react";
+import { CheckoutProgress } from "@/components/CheckoutProgress";
 
 type PaymentMethod = 'all' | 'upi' | 'card' | 'netbanking';
 
@@ -23,6 +26,42 @@ export default function CheckoutPage() {
   const items = useCartStore((state) => state.items);
   const totalPrice = useCartStore((state) => state.totalPrice());
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('upi');
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+
+  const discountedTotal = appliedCoupon ? applyWelcomeDiscountRupees(totalPrice) : totalPrice;
+  const discountAmount = totalPrice - discountedTotal;
+
+  const applyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    setApplyingCoupon(true);
+    try {
+      const res = await fetch('/api/coupon/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (res.ok && data.valid) {
+        setAppliedCoupon(data.code);
+        toast.success(`Coupon applied — ${data.discountPct}% off!`);
+      } else {
+        setAppliedCoupon(null);
+        toast.error(data.error || 'Invalid coupon');
+      }
+    } catch {
+      toast.error('Could not validate coupon. Try again.');
+    } finally {
+      setApplyingCoupon(false);
+    }
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponInput('');
+  };
 
   useEffect(() => {
     if (items.length === 0) {
@@ -43,6 +82,7 @@ export default function CheckoutPage() {
         >
           <ArrowLeft className="w-4 h-4" /> Back to Cart
         </Link>
+        <CheckoutProgress step={2} />
 
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Order Summary */}
@@ -70,19 +110,61 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              <div className="space-y-3 pt-6 border-t border-border">
+              {/* Coupon */}
+              <div className="pt-6 border-t border-border">
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between bg-success/10 border border-success/30 rounded-xl px-4 py-3">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-success">
+                      <Tag className="w-4 h-4" /> {appliedCoupon} applied
+                    </span>
+                    <button
+                      onClick={removeCoupon}
+                      className="text-text-secondary hover:text-white transition-colors"
+                      aria-label="Remove coupon"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && applyCoupon()}
+                      placeholder="Coupon code (try WELCOME10)"
+                      className="flex-grow bg-background border border-border rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-text-secondary focus:border-primary focus:outline-none uppercase"
+                    />
+                    <button
+                      onClick={applyCoupon}
+                      disabled={applyingCoupon || !couponInput.trim()}
+                      className="px-4 py-2.5 rounded-xl border border-primary text-primary font-semibold text-sm hover:bg-primary hover:text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {applyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 pt-6">
                 <div className="flex justify-between items-center text-sm text-text-secondary">
                   <span>Subtotal</span>
                   <span className="font-mono text-white">{formatPrice(totalPrice)}</span>
                 </div>
+                {appliedCoupon && (
+                  <div className="flex justify-between items-center text-sm text-success">
+                    <span>Discount ({appliedCoupon})</span>
+                    <span className="font-mono">−{formatPrice(discountAmount)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center text-sm text-text-secondary">
                   <span>GST (18%)</span>
                   <span className="font-mono text-white">Inclusive</span>
                 </div>
                 <div className="flex justify-between items-end pt-4 mt-2 border-t border-border">
                   <span className="text-lg font-bold text-white">Amount to Pay</span>
-                  <span className="text-3xl font-bold font-mono text-primary">
-                    {formatPrice(totalPrice)}
+                  <span className="text-2xl sm:text-3xl font-bold font-mono text-primary">
+                    {formatPrice(discountedTotal)}
                   </span>
                 </div>
                 <p className="text-xs text-text-secondary text-right">GST inclusive pricing</p>
@@ -107,9 +189,14 @@ export default function CheckoutPage() {
 
               <div className="text-center mb-8">
                 <span className="text-sm text-text-secondary block mb-2">Total Amount</span>
-                <span className="text-5xl font-bold font-mono text-white tracking-tight">
-                  {formatPrice(totalPrice)}
+                <span className="text-4xl sm:text-5xl font-bold font-mono text-white tracking-tight">
+                  {formatPrice(discountedTotal)}
                 </span>
+                {appliedCoupon && (
+                  <span className="block mt-2 text-sm text-success font-semibold">
+                    You save {formatPrice(discountAmount)} with {appliedCoupon}
+                  </span>
+                )}
               </div>
 
               <div className="mb-6">
@@ -140,7 +227,7 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              <RazorpayCheckout productIds={productIds} totalAmount={totalPrice} paymentMethod={selectedMethod} />
+              <RazorpayCheckout productIds={productIds} totalAmount={discountedTotal} paymentMethod={selectedMethod} coupon={appliedCoupon} />
 
               <div className="flex items-center justify-center gap-2 mt-4 mb-6">
                 <Lock className="w-3.5 h-3.5 text-text-secondary" />

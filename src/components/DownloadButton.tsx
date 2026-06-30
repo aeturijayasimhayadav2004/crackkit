@@ -9,6 +9,8 @@ interface DownloadButtonProps {
   productId: string;
   productTitle: string;
   isPurchased: boolean;
+  fileId?: string;
+  label?: string;
   product?: CartItem;
 }
 
@@ -16,6 +18,8 @@ export function DownloadButton({
   productId,
   productTitle,
   isPurchased,
+  fileId,
+  label,
   product,
 }: DownloadButtonProps) {
   const [loading, setLoading] = useState(false);
@@ -24,17 +28,20 @@ export function DownloadButton({
   const handleDownload = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/download/${productId}`);
+      const url = fileId
+        ? `/api/download/${productId}/file/${fileId}`
+        : `/api/download/${productId}`;
+      const response = await fetch(url);
       if (response.ok) {
         const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
+        const objUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = url;
+        a.href = objUrl;
         a.download = `${productTitle}.pdf`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        URL.revokeObjectURL(objUrl);
         toast.success('Download started!');
       } else {
         const data = await response.json().catch(() => ({})) as { error?: string };
@@ -66,7 +73,7 @@ export function DownloadButton({
       <button
         onClick={handleDownload}
         disabled={loading}
-        className="w-full sm:w-auto flex items-center justify-center gap-2 py-2.5 px-6 rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-60 text-white font-semibold transition-colors"
+        className="w-full sm:w-auto flex items-center justify-center gap-2 py-2.5 px-6 rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-60 text-white font-semibold transition-colors text-sm"
       >
         {loading ? (
           <>
@@ -76,7 +83,7 @@ export function DownloadButton({
         ) : (
           <>
             <Download className="w-4 h-4" />
-            Download PDF
+            {label ?? "Download PDF"}
           </>
         )}
       </button>

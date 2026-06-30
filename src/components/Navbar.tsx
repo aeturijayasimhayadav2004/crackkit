@@ -1,21 +1,107 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { ShoppingCart, Menu, X, ChevronDown, Download, User, LogOut, Zap } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import {
+  ShoppingCart, Menu, X, ChevronDown, Download, User, LogOut,
+  Zap, Heart, Search,
+} from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useCartStore } from "@/store/cartStore";
+import { useWishlistStore } from "@/store/wishlistStore";
 import { useAuth } from "@/context/AuthContext";
 import { cn } from "@/lib/utils";
 import toast from "react-hot-toast";
+import { mockProducts } from "@/data/mockProducts";
+import { createClient } from "@/lib/supabase/client";
+
+type SearchResult = {
+  id: string;
+  title: string;
+  slug: string;
+  coverImage: string;
+  category: string;
+  price: number;
+};
+
+type RawProductRow = {
+  id: string;
+  title: string;
+  slug: string;
+  cover_image_url: string | null;
+  price_inr: number;
+  categories: { name: string } | null;
+};
+
+async function searchProducts(query: string): Promise<SearchResult[]> {
+  if (!query || query.length < 2) return [];
+
+  if (
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    try {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("products")
+        .select("id, title, slug, cover_image_url, price_inr, categories(name)")
+        .eq("is_active", true)
+        .ilike("title", `%${query}%`)
+        .limit(5);
+
+      if (data && data.length > 0) {
+        return (data as unknown as RawProductRow[]).map((r) => ({
+          id: r.id,
+          title: r.title,
+          slug: r.slug,
+          coverImage: r.cover_image_url ?? "/covers/placeholder.svg",
+          category: r.categories?.name ?? "",
+          price: Math.round(r.price_inr / 100),
+        }));
+      }
+    } catch {
+      // fall through to mock
+    }
+  }
+
+  const q = query.toLowerCase();
+  return mockProducts
+    .filter(
+      (p) =>
+        p.title.toLowerCase().includes(q) ||
+        p.category.toLowerCase().includes(q) ||
+        p.tags.some((t) => t.toLowerCase().includes(q))
+    )
+    .slice(0, 5)
+    .map((p) => ({
+      id: p.id,
+      title: p.title,
+      slug: p.slug,
+      coverImage: p.coverImage,
+      category: p.category,
+      price: p.price,
+    }));
+}
 
 export function Navbar() {
   const pathname = usePathname();
   const totalItems = useCartStore((state) => state.totalItems());
+  const wishlistCount = useWishlistStore((state) => state.items.length);
+  const [mounted, setMounted] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const { user, profile, isGuest, isLoading, signOut } = useAuth();
+  const [scrolled, setScrolled] = useState(false);
+
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const { user, profile, isGuest, isAdmin, isLoading, signOut } = useAuth();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
 
   const navLinks = [
     { name: "Home", href: "/" },
@@ -23,7 +109,16 @@ export function Navbar() {
     { name: "About", href: "/about" },
   ];
 
-  // Close dropdown on outside click
+  useEffect(() => setMounted(true), []);
+
+  // Scroll-shrink
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Close user dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
@@ -33,6 +128,56 @@ export function Navbar() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Close search on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(e.target as Node)
+      ) {
+        setIsSearchOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Escape closes search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsSearchOpen(false);
+        setSearchQuery("");
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
+  // Focus input on open, reset on close
+  useEffect(() => {
+    if (isSearchOpen) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    } else {
+      setSearchQuery("");
+      setSearchResults([]);
+    }
+  }, [isSearchOpen]);
+
+  // Debounced search
+  const runSearch = useCallback(async (q: string) => {
+    if (q.length < 2) { setSearchResults([]); return; }
+    setIsSearching(true);
+    const results = await searchProducts(q);
+    setSearchResults(results);
+    setIsSearching(false);
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => runSearch(searchQuery), 250);
+    return () => clearTimeout(timer);
+  }, [searchQuery, runSearch]);
 
   const handleSignOut = async () => {
     setIsDropdownOpen(false);
@@ -47,10 +192,26 @@ export function Navbar() {
     : (profile?.full_name ?? "U").charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md">
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2">
-          <span className="text-2xl font-bold font-syne text-white tracking-tight">
+    <header
+      className={cn(
+        "sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md transition-all duration-300",
+        scrolled && "shadow-lg shadow-black/20"
+      )}
+    >
+      <div
+        className={cn(
+          "container mx-auto px-4 flex items-center justify-between transition-all duration-300",
+          scrolled ? "h-12" : "h-16"
+        )}
+      >
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2 shrink-0">
+          <span
+            className={cn(
+              "font-bold font-syne text-white tracking-tight transition-all duration-300",
+              scrolled ? "text-xl" : "text-2xl"
+            )}
+          >
             <span className="text-primary">⚡</span> CrackKit
           </span>
         </Link>
@@ -74,11 +235,39 @@ export function Navbar() {
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden md:flex items-center gap-4">
+        <div className="hidden md:flex items-center gap-3">
+          {/* Search */}
+          <button
+            onClick={() => setIsSearchOpen((v) => !v)}
+            aria-label="Search products"
+            className={cn(
+              "p-2 rounded-lg transition-colors",
+              isSearchOpen
+                ? "text-primary bg-primary/10"
+                : "text-text-secondary hover:text-white hover:bg-surface"
+            )}
+          >
+            <Search className="w-5 h-5" />
+          </button>
+
+          {/* Wishlist */}
+          <Link
+            href="/wishlist"
+            className="relative p-2 text-text-secondary hover:text-white transition-colors"
+            aria-label="Wishlist"
+          >
+            <Heart className="w-5 h-5" />
+            {mounted && wishlistCount > 0 && (
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-badge rounded-full">
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
+
           {/* Cart */}
           <Link href="/cart" className="relative p-2 text-text-secondary hover:text-white transition-colors">
             <ShoppingCart className="w-5 h-5" />
-            {totalItems > 0 && (
+            {mounted && totalItems > 0 && (
               <span className="absolute top-0 right-0 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-badge rounded-full">
                 {totalItems}
               </span>
@@ -97,7 +286,12 @@ export function Navbar() {
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-bold font-syne">
                   {initials}
                 </div>
-                <ChevronDown className={cn("w-4 h-4 text-text-secondary transition-transform", isDropdownOpen && "rotate-180")} />
+                <ChevronDown
+                  className={cn(
+                    "w-4 h-4 text-text-secondary transition-transform",
+                    isDropdownOpen && "rotate-180"
+                  )}
+                />
               </button>
 
               {isDropdownOpen && (
@@ -118,6 +312,16 @@ export function Navbar() {
                     </Link>
                   ) : (
                     <>
+                      {isAdmin && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setIsDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-sm text-primary hover:bg-primary/10 transition-colors font-medium"
+                        >
+                          <Zap className="w-4 h-4" />
+                          Admin Portal
+                        </Link>
+                      )}
                       <Link
                         href="/dashboard/downloads"
                         onClick={() => setIsDropdownOpen(false)}
@@ -168,10 +372,25 @@ export function Navbar() {
         </div>
 
         {/* Mobile Toggle */}
-        <div className="flex md:hidden items-center gap-4">
+        <div className="flex md:hidden items-center gap-1">
+          <button
+            onClick={() => setIsSearchOpen((v) => !v)}
+            aria-label="Search"
+            className="p-2 text-text-secondary hover:text-white"
+          >
+            <Search className="w-5 h-5" />
+          </button>
+          <Link href="/wishlist" className="relative p-2 text-text-secondary hover:text-white" aria-label="Wishlist">
+            <Heart className="w-5 h-5" />
+            {mounted && wishlistCount > 0 && (
+              <span className="absolute top-0 right-0 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-badge rounded-full">
+                {wishlistCount}
+              </span>
+            )}
+          </Link>
           <Link href="/cart" className="relative p-2 text-text-secondary hover:text-white">
             <ShoppingCart className="w-5 h-5" />
-            {totalItems > 0 && (
+            {mounted && totalItems > 0 && (
               <span className="absolute top-0 right-0 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-badge rounded-full">
                 {totalItems}
               </span>
@@ -186,9 +405,78 @@ export function Navbar() {
         </div>
       </div>
 
+      {/* Search panel — drops below navbar */}
+      {isSearchOpen && (
+        <div
+          ref={searchContainerRef}
+          className="absolute top-full left-0 w-full bg-background/98 backdrop-blur-lg border-b border-border shadow-2xl z-40"
+        >
+          <div className="container mx-auto px-4 py-4">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search DSA notes, MERN kit, System Design..."
+                className="w-full bg-surface border border-border rounded-xl pl-10 pr-10 py-3 text-white placeholder:text-text-secondary focus:border-primary focus:outline-none text-sm"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Results list */}
+            {searchResults.length > 0 && (
+              <div className="mt-3 space-y-1 max-h-[50vh] overflow-y-auto">
+                {searchResults.map((r) => (
+                  <Link
+                    key={r.id}
+                    href={`/products/${r.slug}`}
+                    onClick={() => setIsSearchOpen(false)}
+                    className="flex items-center gap-3 p-3 hover:bg-surface rounded-xl transition-colors group"
+                  >
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-surface flex-shrink-0">
+                      <Image src={r.coverImage} alt={r.title} fill className="object-cover" />
+                    </div>
+                    <div className="flex-grow min-w-0">
+                      <p className="text-white font-semibold text-sm line-clamp-1 group-hover:text-primary transition-colors">
+                        {r.title}
+                      </p>
+                      <p className="text-text-secondary text-xs">{r.category}</p>
+                    </div>
+                    <span className="text-primary font-mono font-bold text-sm flex-shrink-0">
+                      ₹{r.price}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {searchQuery.length >= 2 && searchResults.length === 0 && !isSearching && (
+              <p className="text-text-secondary text-sm text-center py-6">
+                No results for &ldquo;{searchQuery}&rdquo;
+              </p>
+            )}
+
+            {isSearching && (
+              <div className="flex justify-center py-4">
+                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Mobile Drawer */}
       {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-16 left-0 w-full h-[calc(100vh-64px)] bg-background/95 backdrop-blur-lg border-t border-border flex flex-col p-4 gap-4 shadow-2xl">
+        <div className="md:hidden absolute top-full left-0 w-full h-[calc(100vh-64px)] bg-background/95 backdrop-blur-lg border-t border-border flex flex-col p-4 gap-4 shadow-2xl z-40">
           <nav className="flex flex-col gap-4">
             {navLinks.map((link) => (
               <Link
