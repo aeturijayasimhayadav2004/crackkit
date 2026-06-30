@@ -17,11 +17,15 @@ type Subscription = {
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
 
-  // Vercel strips Authorization headers — use query param or header fallback
+  // Auth: Vercel auto-cron sends its CRON_SECRET header; manual calls use ?secret param
   const authHeader = req.headers.get('authorization')
   const authParam = searchParams.get('secret')
-  const secret = process.env.JOB_AGENT_SECRET
-  if (authHeader !== `Bearer ${secret}` && authParam !== secret) {
+  const vercelCronSecret = process.env.CRON_SECRET
+  const manualSecret = process.env.JOB_AGENT_SECRET
+  const authorized =
+    (vercelCronSecret && authHeader === `Bearer ${vercelCronSecret}`) ||
+    (manualSecret && authParam === manualSecret)
+  if (!authorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const dryRun = searchParams.get('dry_run') === '1'
