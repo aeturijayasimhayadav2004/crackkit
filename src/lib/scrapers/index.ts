@@ -15,7 +15,7 @@ export async function scrapeJobsForDomains(
 ): Promise<Record<string, JobListing[]>> {
   const result: Record<string, JobListing[]> = {}
 
-  await Promise.all(
+  await Promise.allSettled(
     domains.map(async (domain) => {
       if (domain in JOB_DOMAINS) {
         result[domain] = await scrapeForDomain(domain as DomainKey, experience)
@@ -60,7 +60,7 @@ async function scrapeNaukri(keyword: string, expMin: number, expMax: number): Pr
       systemid: '109',
       'Content-Type': 'application/json',
     },
-    signal: AbortSignal.timeout(7000),
+    signal: AbortSignal.timeout(8000),
     cache: 'no-store',
   })
 
@@ -80,31 +80,40 @@ async function scrapeNaukri(keyword: string, expMin: number, expMax: number): Pr
       title: job.title ?? '',
       company: job.companyName ?? '',
       location: job.location?.slice(0, 2).join(', ') ?? 'India',
-      url: job.jdURL
-        ? `https://www.naukri.com${job.jdURL}`
-        : 'https://www.naukri.com',
+      url: job.jdURL ? `https://www.naukri.com${job.jdURL}` : 'https://www.naukri.com',
       source: 'Naukri',
     }))
     .filter((j) => j.title)
 }
 
 async function scrapeLinkedIn(keyword: string, experienceFilter: string): Promise<JobListing[]> {
-  const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keyword)}&location=India&f_E=${encodeURIComponent(experienceFilter)}&start=0`
+  // Try with experience filter first
+  const jobs = await fetchLinkedInPage(keyword, experienceFilter)
+  // If experience filter returned nothing, fall back to no filter
+  if (jobs.length === 0 && experienceFilter) {
+    return fetchLinkedInPage(keyword, '')
+  }
+  return jobs
+}
 
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    },
-    signal: AbortSignal.timeout(7000),
-    cache: 'no-store',
-  })
+async function fetchLinkedInPage(keyword: string, experienceFilter: string): Promise<JobListing[]> {
+  const filterParam = experienceFilter ? `&f_E=${encodeURIComponent(experienceFilter)}` : ''
+  const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keyword)}&location=India${filterParam}&start=0`
 
-  if (!res.ok) return []
-
-  const html = await res.text()
-  return parseLinkedInCards(html)
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      },
+      signal: AbortSignal.timeout(8000),
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
+    return parseLinkedInCards(await res.text())
+  } catch {
+    return []
+  }
 }
 
 function parseLinkedInCards(html: string): JobListing[] {
@@ -120,14 +129,12 @@ function parseLinkedInCards(html: string): JobListing[] {
     const title = titleMatch?.[1]?.replace(/<[^>]+>/g, '').trim() ?? ''
     if (!title) continue
 
-    // Company is in an <a> tag inside base-search-card__subtitle
     const companyMatch = card.match(/base-search-card__subtitle[\s\S]*?>([\s\S]*?)<\/(?:a|h4)>/)
     const company = companyMatch?.[1]?.replace(/<[^>]+>/g, '').trim() ?? ''
 
     const locationMatch = card.match(/job-search-card__location[^>]*>([\s\S]*?)<\/span>/)
     const location = locationMatch?.[1]?.trim() ?? 'India'
 
-    // Clean URL by removing tracking params
     const urlMatch = card.match(/href="([^"]*jobs\/view[^"]*)"/)
     const rawUrl = urlMatch?.[1] ?? ''
     const url = rawUrl.split('?')[0]
@@ -147,88 +154,84 @@ async function scrapeInternshala(keyword: string): Promise<JobListing[]> {
     .replace(/[^a-z0-9-]/g, '')
   const pageUrl = `https://internshala.com/jobs/${slug}-jobs-in-india`
 
-  const res = await fetch(pageUrl, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-    signal: AbortSignal.timeout(7000),
-    cache: 'no-store',
-  })
+  try {
+    const res = await fetch(pageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(8000),
+      cache: 'no-store',
+    })
+    if (!res.ok) return []
 
-  if (!res.ok) return []
+    const html = await res.text()
+    const jobs: JobListing[] = []
+    const jsonLdRegex = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g
+    let jsonMatch: RegExpExecArray | null
 
-  const html = await res.text()
-  const jobs: JobListing[] = []
-  const jsonLdRegex = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g
-  let jsonMatch: RegExpExecArray | null
+    while ((jsonMatch = jsonLdRegex.exec(html)) !== null) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]) as unknown
+        const listings = Array.isArray(parsed) ? parsed : [parsed]
 
-  while ((jsonMatch = jsonLdRegex.exec(html)) !== null) {
-    try {
-      const parsed = JSON.parse(jsonMatch[1]) as unknown
-      const listings = Array.isArray(parsed) ? parsed : [parsed]
-
-      for (const item of listings as Record<string, unknown>[]) {
-        // Handle legacy JobPosting schema
-        if (item?.['@type'] === 'JobPosting' && typeof item.title === 'string') {
-          const org = item.hiringOrganization as Record<string, unknown> | undefined
-          jobs.push({
-            title: item.title,
-            company: typeof org?.name === 'string' ? org.name : '',
-            location: 'India',
-            url: typeof item.url === 'string' ? item.url : pageUrl,
-            source: 'Internshala',
-          })
-        }
-
-        // Handle ItemList schema (current Internshala format)
-        if (item?.['@type'] === 'ItemList' && Array.isArray(item.itemListElement)) {
-          for (const listItem of item.itemListElement as Record<string, unknown>[]) {
-            if (jobs.length >= 5) break
-            const title = typeof listItem.name === 'string' ? listItem.name : ''
-            const jobUrl = typeof listItem.url === 'string' ? listItem.url : ''
-            if (!title || !jobUrl) continue
-
-            // Parse company + location from URL slug
-            // URL: .../[slug]-job-in-[location]-at-[company][digits]
-            const slug2 = jobUrl.split('/').pop() ?? ''
-            const atIdx = slug2.lastIndexOf('-at-')
-            const jobInIdx = slug2.indexOf('-job-in-')
-
-            let company = ''
-            let location = 'India'
-
-            if (atIdx > -1) {
-              // company: after "-at-", strip trailing digits
-              const companySlug = slug2.slice(atIdx + 4).replace(/\d+$/, '')
-              company = companySlug
-                .split('-')
-                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                .join(' ')
-                .trim()
-            }
-
-            if (jobInIdx > -1 && atIdx > -1) {
-              const locationSlug = slug2.slice(jobInIdx + 8, atIdx)
-              location = locationSlug
-                .split('-')
-                .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-                .join(' ')
-                .trim() || 'India'
-            }
-
-            jobs.push({ title, company, location, url: jobUrl, source: 'Internshala' })
+        for (const item of listings as Record<string, unknown>[]) {
+          if (item?.['@type'] === 'JobPosting' && typeof item.title === 'string') {
+            const org = item.hiringOrganization as Record<string, unknown> | undefined
+            jobs.push({
+              title: item.title,
+              company: typeof org?.name === 'string' ? org.name : '',
+              location: 'India',
+              url: typeof item.url === 'string' ? item.url : pageUrl,
+              source: 'Internshala',
+            })
           }
-        }
 
-        if (jobs.length >= 5) break
+          if (item?.['@type'] === 'ItemList' && Array.isArray(item.itemListElement)) {
+            for (const listItem of item.itemListElement as Record<string, unknown>[]) {
+              if (jobs.length >= 5) break
+              const title = typeof listItem.name === 'string' ? listItem.name : ''
+              const jobUrl = typeof listItem.url === 'string' ? listItem.url : ''
+              if (!title || !jobUrl) continue
+
+              const slug2 = jobUrl.split('/').pop() ?? ''
+              const atIdx = slug2.lastIndexOf('-at-')
+              const jobInIdx = slug2.indexOf('-job-in-')
+
+              let company = ''
+              let location = 'India'
+
+              if (atIdx > -1) {
+                const companySlug = slug2.slice(atIdx + 4).replace(/\d+$/, '')
+                company = companySlug
+                  .split('-')
+                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                  .join(' ')
+                  .trim()
+              }
+
+              if (jobInIdx > -1 && atIdx > -1) {
+                const locationSlug = slug2.slice(jobInIdx + 8, atIdx)
+                location = locationSlug
+                  .split('-')
+                  .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+                  .join(' ')
+                  .trim() || 'India'
+              }
+
+              jobs.push({ title, company, location, url: jobUrl, source: 'Internshala' })
+            }
+          }
+
+          if (jobs.length >= 5) break
+        }
+      } catch {
+        // ignore malformed JSON-LD
       }
-    } catch {
-      // ignore malformed JSON-LD
+      if (jobs.length >= 5) break
     }
 
-    if (jobs.length >= 5) break
+    return jobs
+  } catch {
+    return []
   }
-
-  return jobs
 }

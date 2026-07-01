@@ -1,52 +1,57 @@
 import { JOB_DOMAINS, type DomainKey } from '@/lib/job-domains'
+import { EXPERIENCE_LEVELS, type ExperienceKey } from '@/lib/experience-levels'
 import type { JobListing } from '@/lib/scrapers'
 
 export function buildJobAlertEmail(opts: {
   domains: string[]
   jobsByDomain: Record<string, JobListing[]>
+  experience?: ExperienceKey
   unsubUrl: string
   date: string
 }): string {
-  const { domains, jobsByDomain, unsubUrl, date } = opts
+  const { domains, jobsByDomain, experience, unsubUrl, date } = opts
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://crackkit.store'
 
-  const domainSections = domains
+  const expConfig = experience ? EXPERIENCE_LEVELS[experience] : null
+  const totalJobs = Object.values(jobsByDomain).reduce((sum, j) => sum + j.length, 0)
+
+  // Only render domains that have jobs
+  const activeDomains = domains.filter((d) => (jobsByDomain[d]?.length ?? 0) > 0)
+
+  const domainSections = activeDomains
     .map((domain) => {
       const config = JOB_DOMAINS[domain as DomainKey]
       if (!config) return ''
 
       const jobs = jobsByDomain[domain] ?? []
 
-      if (jobs.length === 0) {
-        return `
-          <div style="margin-bottom:32px">
-            <h2 style="font-size:17px;color:#6C5CE7;margin:0 0 8px">${config.icon} ${config.label}</h2>
-            <p style="color:#666;font-size:14px;margin:0">No new jobs found today. We'll keep searching!</p>
-          </div>`
-      }
-
       const jobRows = jobs
-        .map(
-          (job) => `
+        .map((job) => {
+          const safeUrl = sanitizeUrl(job.url)
+          return `
           <div style="background:#13131f;border:1px solid #2a2a40;border-radius:10px;padding:14px 16px;margin-bottom:10px">
-            <a href="${escapeAttr(job.url)}" style="color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;line-height:1.4;display:block;margin-bottom:5px">${escapeHtml(job.title)}</a>
+            <a href="${safeUrl}" style="color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;line-height:1.4;display:block;margin-bottom:5px">${escapeHtml(job.title)}</a>
             ${job.company ? `<div style="color:#8888aa;font-size:13px;margin-bottom:8px">${escapeHtml(job.company)}</div>` : ''}
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
               <span style="font-size:11px;color:#6C5CE7;background:rgba(108,92,231,0.12);padding:2px 9px;border-radius:20px;border:1px solid rgba(108,92,231,0.25)">📍 ${escapeHtml(job.location)}</span>
               <span style="font-size:11px;color:#777;background:#0d0d18;padding:2px 9px;border-radius:20px;border:1px solid #222238">${escapeHtml(job.source)}</span>
             </div>
-            <a href="${escapeAttr(job.url)}" style="color:#6C5CE7;font-size:13px;font-weight:600;text-decoration:none">Apply Now →</a>
+            <a href="${safeUrl}" style="color:#6C5CE7;font-size:13px;font-weight:600;text-decoration:none">Apply Now →</a>
           </div>`
-        )
+        })
         .join('')
 
       return `
         <div style="margin-bottom:36px">
-          <h2 style="font-size:17px;color:#6C5CE7;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid #2a2a40">${config.icon} ${config.label}</h2>
+          <h2 style="font-size:17px;color:#6C5CE7;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid #2a2a40">${config.icon} ${config.label} <span style="font-size:13px;color:#555577;font-weight:400">(${jobs.length} jobs)</span></h2>
           ${jobRows}
         </div>`
     })
     .join('')
+
+  const experienceBadge = expConfig
+    ? `<span style="display:inline-block;font-size:12px;background:rgba(108,92,231,0.15);color:#9d8ff0;padding:3px 12px;border-radius:20px;border:1px solid rgba(108,92,231,0.3);margin-top:8px">${expConfig.icon} ${expConfig.label} · ${expConfig.description}</span>`
+    : ''
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -62,7 +67,8 @@ export function buildJobAlertEmail(opts: {
     <div style="text-align:center;margin-bottom:28px;padding:28px 24px;background:linear-gradient(135deg,#16062e,#0d0d1e);border-radius:16px;border:1px solid #2a2a40">
       <p style="color:#6C5CE7;font-size:26px;font-weight:800;margin:0 0 6px;letter-spacing:-0.5px">⚡ CrackKit</p>
       <p style="color:#5a5a7a;font-size:13px;margin:0 0 10px">${escapeHtml(date)}</p>
-      <p style="color:#e0e0f0;font-size:17px;font-weight:600;margin:0">Your Daily Job Digest 🇮🇳</p>
+      <p style="color:#e0e0f0;font-size:17px;font-weight:600;margin:0 0 4px">${totalJobs} Fresh Jobs Curated For You 🇮🇳</p>
+      ${experienceBadge}
     </div>
 
     <!-- Job sections -->
@@ -85,6 +91,16 @@ export function buildJobAlertEmail(opts: {
 </html>`
 }
 
+function sanitizeUrl(url: string): string {
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return '#'
+    return parsed.href
+  } catch {
+    return '#'
+  }
+}
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
@@ -92,8 +108,4 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
-}
-
-function escapeAttr(str: string): string {
-  return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
