@@ -86,18 +86,6 @@ export function ProductDetailClient({
                 className="absolute top-4 left-4 text-base px-3 py-1.5"
               />
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="relative aspect-video rounded-xl overflow-hidden bg-surface border border-border opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
-                >
-                  <div className="absolute inset-0 flex items-center justify-center text-text-secondary text-xs font-medium">
-                    Preview {i}
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
           {/* Right: Details */}
