@@ -39,7 +39,6 @@ export function JobAgentDomainSelector({ value, onChange }: Props) {
                     : 'border-border bg-background text-text-secondary hover:border-primary/50 hover:text-white'
                 )}
               >
-                <span className="text-xl">{config.icon}</span>
                 <span className="font-semibold text-sm">{config.label}</span>
                 {selected && (
                   <span className="ml-auto w-2 h-2 rounded-full bg-primary" />

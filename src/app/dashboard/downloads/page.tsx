@@ -165,12 +165,11 @@ export default async function DownloadsPage() {
                             <div className="flex flex-wrap gap-2 mt-1">
                               <div className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary">
                                 <Briefcase className="w-3 h-3" />
-                                {EXPERIENCE_LEVELS[agentSubscription.experience].icon}{' '}
                                 {EXPERIENCE_LEVELS[agentSubscription.experience].label}
                               </div>
                               {agentSubscription.domains.map((d) => (
                                 <div key={d} className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-surface border border-border text-text-secondary">
-                                  {d === 'tech' ? '💻 Tech / Software' : '🎨 Design / Creative'}
+                                  {d === 'tech' ? 'Tech / Software' : 'Design / Creative'}
                                 </div>
                               ))}
                             </div>

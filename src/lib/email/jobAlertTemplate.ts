@@ -43,14 +43,14 @@ export function buildJobAlertEmail(opts: {
 
       return `
         <div style="margin-bottom:36px">
-          <h2 style="font-size:17px;color:#6C5CE7;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid #2a2a40">${config.icon} ${config.label} <span style="font-size:13px;color:#555577;font-weight:400">(${jobs.length} jobs)</span></h2>
+          <h2 style="font-size:17px;color:#6C5CE7;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid #2a2a40">${config.label} <span style="font-size:13px;color:#555577;font-weight:400">(${jobs.length} jobs)</span></h2>
           ${jobRows}
         </div>`
     })
     .join('')
 
   const experienceBadge = expConfig
-    ? `<span style="display:inline-block;font-size:12px;background:rgba(108,92,231,0.15);color:#9d8ff0;padding:3px 12px;border-radius:20px;border:1px solid rgba(108,92,231,0.3);margin-top:8px">${expConfig.icon} ${expConfig.label} · ${expConfig.description}</span>`
+    ? `<span style="display:inline-block;font-size:12px;background:rgba(108,92,231,0.15);color:#9d8ff0;padding:3px 12px;border-radius:20px;border:1px solid rgba(108,92,231,0.3);margin-top:8px">${expConfig.label} · ${expConfig.description}</span>`
     : ''
 
   return `<!DOCTYPE html>

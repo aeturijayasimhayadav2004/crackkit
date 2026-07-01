@@ -30,8 +30,7 @@ export function ExperienceLevelSelector({ value, onChange }: Props) {
                     : 'border-border bg-background text-text-secondary hover:border-primary/50 hover:text-white'
                 )}
               >
-                <span className="text-lg leading-none">{config.icon}</span>
-                <span className="font-semibold text-sm mt-1">{config.label}</span>
+                <span className="font-semibold text-sm">{config.label}</span>
                 <span className="text-xs text-text-secondary">{config.description}</span>
               </button>
             )
