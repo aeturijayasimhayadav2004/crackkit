@@ -7,10 +7,12 @@ import { PriceDisplay } from "@/components/PriceDisplay";
 import { DiscountBadge } from "@/components/DiscountBadge";
 import { ProductCard } from "@/components/ProductCard";
 import { JobAgentDomainSelector } from "@/components/JobAgentDomainSelector";
+import { ExperienceLevelSelector } from "@/components/ExperienceLevelSelector";
 import { calculateDiscount } from "@/lib/utils";
 import { useCartStore } from "@/store/cartStore";
 import { type Product } from "@/data/mockProducts";
 import { type DomainKey } from "@/lib/job-domains";
+import { type ExperienceKey } from "@/lib/experience-levels";
 import {
   Star,
   Zap,
@@ -38,13 +40,17 @@ export function ProductDetailClient({
   const addItem = useCartStore((state) => state.addItem);
   const [activeTab, setActiveTab] = useState("description");
   const [agentDomains, setAgentDomains] = useState<DomainKey[]>(["tech"]);
+  const [agentExperience, setAgentExperience] = useState<ExperienceKey>("fresher");
 
   const isAgent = product.slug === "job-alert-agent";
   const discount = calculateDiscount(product.originalPrice, product.price);
 
   const saveAgentDomains = () => {
     if (isAgent) {
-      localStorage.setItem("crackkit_agent_domains", JSON.stringify(agentDomains));
+      localStorage.setItem(
+        "crackkit_agent_prefs",
+        JSON.stringify({ domains: agentDomains, experience: agentExperience })
+      );
     }
   };
 
@@ -144,8 +150,9 @@ export function ProductDetailClient({
                     </div>
                   </div>
 
-                  <div className="mb-8">
+                  <div className="flex flex-col gap-5 mb-8">
                     <JobAgentDomainSelector value={agentDomains} onChange={setAgentDomains} />
+                    <ExperienceLevelSelector value={agentExperience} onChange={setAgentExperience} />
                   </div>
                 </>
               ) : (

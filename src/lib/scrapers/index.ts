@@ -1,4 +1,5 @@
 import { JOB_DOMAINS, type DomainKey } from '@/lib/job-domains'
+import { EXPERIENCE_LEVELS, type ExperienceKey } from '@/lib/experience-levels'
 
 export type JobListing = {
   title: string
@@ -9,14 +10,15 @@ export type JobListing = {
 }
 
 export async function scrapeJobsForDomains(
-  domains: string[]
+  domains: string[],
+  experience: ExperienceKey = 'fresher'
 ): Promise<Record<string, JobListing[]>> {
   const result: Record<string, JobListing[]> = {}
 
   await Promise.all(
     domains.map(async (domain) => {
       if (domain in JOB_DOMAINS) {
-        result[domain] = await scrapeForDomain(domain as DomainKey)
+        result[domain] = await scrapeForDomain(domain as DomainKey, experience)
       }
     })
   )
@@ -24,12 +26,13 @@ export async function scrapeJobsForDomains(
   return result
 }
 
-async function scrapeForDomain(domain: DomainKey): Promise<JobListing[]> {
+async function scrapeForDomain(domain: DomainKey, experience: ExperienceKey): Promise<JobListing[]> {
   const config = JOB_DOMAINS[domain]
+  const expConfig = EXPERIENCE_LEVELS[experience]
 
   const [naukri, linkedin, internshala] = await Promise.allSettled([
-    scrapeNaukri(config.naukriKeyword),
-    scrapeLinkedIn(config.searchKeyword),
+    scrapeNaukri(config.naukriKeyword, expConfig.naukriMin, expConfig.naukriMax),
+    scrapeLinkedIn(config.searchKeyword, expConfig.linkedInFilter),
     scrapeInternshala(config.searchKeyword),
   ])
 
@@ -48,8 +51,8 @@ async function scrapeForDomain(domain: DomainKey): Promise<JobListing[]> {
     .slice(0, 10)
 }
 
-async function scrapeNaukri(keyword: string): Promise<JobListing[]> {
-  const url = `https://www.naukri.com/jobapi/v3/search?noOfResults=5&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk&keyword=${encodeURIComponent(keyword)}&location=india`
+async function scrapeNaukri(keyword: string, expMin: number, expMax: number): Promise<JobListing[]> {
+  const url = `https://www.naukri.com/jobapi/v3/search?noOfResults=5&urlType=search_by_keyword&searchType=adv&src=jobsearchDesk&keyword=${encodeURIComponent(keyword)}&location=india&experienceMin=${expMin}&experienceMax=${expMax}`
 
   const res = await fetch(url, {
     headers: {
@@ -85,8 +88,8 @@ async function scrapeNaukri(keyword: string): Promise<JobListing[]> {
     .filter((j) => j.title)
 }
 
-async function scrapeLinkedIn(keyword: string): Promise<JobListing[]> {
-  const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keyword)}&location=India&start=0`
+async function scrapeLinkedIn(keyword: string, experienceFilter: string): Promise<JobListing[]> {
+  const url = `https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords=${encodeURIComponent(keyword)}&location=India&f_E=${encodeURIComponent(experienceFilter)}&start=0`
 
   const res = await fetch(url, {
     headers: {

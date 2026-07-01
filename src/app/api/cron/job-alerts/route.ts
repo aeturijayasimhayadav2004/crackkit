@@ -4,6 +4,7 @@ import { Resend } from 'resend'
 import crypto from 'crypto'
 import { scrapeJobsForDomains } from '@/lib/scrapers'
 import { buildJobAlertEmail } from '@/lib/email/jobAlertTemplate'
+import { type ExperienceKey } from '@/lib/experience-levels'
 import { format } from 'date-fns'
 
 export const maxDuration = 60
@@ -12,6 +13,7 @@ type Subscription = {
   user_id: string
   email: string
   domains: string[]
+  experience: ExperienceKey
 }
 
 export async function GET(req: Request) {
@@ -44,14 +46,17 @@ export async function GET(req: Request) {
 
   const { data: subs, error } = await supabaseAdmin
     .from('job_agent_subscriptions')
-    .select('user_id, email, domains')
+    .select('user_id, email, domains, experience')
     .eq('active', true)
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const subscriptions = (subs ?? []) as Subscription[]
+  const subscriptions = (subs ?? []).map((s) => ({
+    ...s,
+    experience: (s.experience ?? 'fresher') as ExperienceKey,
+  })) as Subscription[]
 
   // dry_run with ?test_domains=tech,design scrapes without needing real subscriptions
   if (subscriptions.length === 0 && !dryRun) {
@@ -61,23 +66,56 @@ export async function GET(req: Request) {
   const testDomains = dryRun
     ? (searchParams.get('test_domains') ?? 'tech,design').split(',').filter(Boolean)
     : []
+  const testExperience = (searchParams.get('test_experience') ?? 'fresher') as ExperienceKey
 
-  // Scrape once per unique domain (shared across subscribers)
-  const uniqueDomains = [
-    ...new Set([...subscriptions.flatMap((s) => s.domains), ...testDomains]),
-  ]
-  const jobsByDomain = await scrapeJobsForDomains(uniqueDomains)
+  // Scrape once per unique (domain, experience) pair to avoid redundant requests
+  type ScrapeCacheKey = string // `${domain}:${experience}`
+  const scrapeCache = new Map<ScrapeCacheKey, ReturnType<typeof scrapeJobsForDomains>>()
+
+  const getJobs = (domains: string[], experience: ExperienceKey) => {
+    const key = `${domains.sort().join(',')}:${experience}`
+    if (!scrapeCache.has(key)) {
+      scrapeCache.set(key, scrapeJobsForDomains(domains, experience))
+    }
+    return scrapeCache.get(key)!
+  }
+
+  // Kick off all unique scrape combos in parallel
+  const scrapePromises: Promise<void>[] = []
+
+  if (dryRun) {
+    scrapePromises.push(getJobs(testDomains, testExperience).then(() => undefined))
+  } else {
+    // Group subscriptions by experience to minimise scrape calls
+    const byExperience = new Map<ExperienceKey, Set<string>>()
+    for (const sub of subscriptions) {
+      if (!byExperience.has(sub.experience)) byExperience.set(sub.experience, new Set())
+      for (const d of sub.domains) byExperience.get(sub.experience)!.add(d)
+    }
+    for (const [exp, domainSet] of byExperience) {
+      scrapePromises.push(getJobs([...domainSet], exp).then(() => undefined))
+    }
+  }
+
+  await Promise.all(scrapePromises)
 
   const resend = dryRun ? null : new Resend(process.env.RESEND_API_KEY!)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://crackkit.store'
   const date = format(new Date(), 'MMMM d, yyyy')
+
+  // Handle dry_run with no real subscriptions
+  if (dryRun && subscriptions.length === 0) {
+    const jobs = await getJobs(testDomains, testExperience)
+    return NextResponse.json({ ok: true, dry_run: true, jobs })
+  }
 
   let sent = 0
   const failed: string[] = []
 
   for (const sub of subscriptions) {
     try {
-      // Build per-user domain→jobs map
+      const jobsByDomain = await getJobs(sub.domains, sub.experience)
+
       const userJobsByDomain: Record<string, (typeof jobsByDomain)[string]> = {}
       for (const domain of sub.domains) {
         userJobsByDomain[domain] = jobsByDomain[domain] ?? []
@@ -88,7 +126,6 @@ export async function GET(req: Request) {
         0
       )
 
-      // Skip email if no jobs found for this user's domains
       if (totalJobs === 0) continue
 
       const unsubToken = crypto
@@ -121,15 +158,11 @@ export async function GET(req: Request) {
     }
   }
 
-  if (dryRun && subscriptions.length === 0) {
-    return NextResponse.json({ ok: true, dry_run: true, jobs: jobsByDomain })
-  }
-
   return NextResponse.json({
     ok: true,
     sent,
     total: subscriptions.length,
-    ...(dryRun && { dry_run: true, jobs: jobsByDomain }),
+    ...(dryRun && { dry_run: true }),
     ...(failed.length > 0 && { failed }),
   })
 }

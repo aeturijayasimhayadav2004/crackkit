@@ -19,7 +19,7 @@ export async function GET() {
 
   const { data } = await supabaseAdmin
     .from('job_agent_subscriptions')
-    .select('domains, active, created_at')
+    .select('domains, experience, active, created_at')
     .eq('user_id', user.id)
     .maybeSingle()
 

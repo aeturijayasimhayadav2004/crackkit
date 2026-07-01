@@ -6,8 +6,10 @@ import { DownloadButton } from "@/components/DownloadButton";
 import { createClient } from "@/lib/supabase/server";
 import { supabaseAdmin } from "@/lib/admin";
 import { getProducts, getUserPurchases } from "@/lib/supabase/queries";
-import { Calendar, FileText, Package, CheckCircle2, Mail } from "lucide-react";
+import { Calendar, FileText, Package, CheckCircle2, Mail, Briefcase } from "lucide-react";
 import { formatDate, formatPrice } from "@/lib/utils";
+import { EXPERIENCE_LEVELS, type ExperienceKey } from "@/lib/experience-levels";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 
 type ProductFile = {
   id: string;
@@ -36,6 +38,28 @@ export default async function DownloadsPage() {
   const purchasedSet = new Set(purchasedIds);
   const purchasedProducts = allProducts.filter((p) => purchasedSet.has(p.id));
   const unpurchasedProducts = allProducts.filter((p) => !purchasedSet.has(p.id));
+
+  // Fetch job agent subscription if the user purchased it
+  let agentSubscription: { domains: string[]; experience: ExperienceKey } | null = null
+  const hasAgentProduct = purchasedProducts.some((p) => p.slug === 'job-alert-agent')
+  if (hasAgentProduct) {
+    const adminClient = createAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { data: subData } = await adminClient
+      .from('job_agent_subscriptions')
+      .select('domains, experience')
+      .eq('user_id', user.id)
+      .eq('active', true)
+      .maybeSingle()
+    if (subData) {
+      agentSubscription = {
+        domains: subData.domains as string[],
+        experience: (subData.experience ?? 'fresher') as ExperienceKey,
+      }
+    }
+  }
 
   // Fetch additional files for purchased products
   let filesByProduct = new Map<string, ProductFile[]>();
@@ -135,8 +159,22 @@ export default async function DownloadsPage() {
                           </div>
                           <div className="flex items-start gap-2 text-text-secondary text-sm">
                             <Mail className="w-4 h-4 flex-shrink-0 mt-0.5 text-primary" />
-                            <span>You will receive emails with fresh Indian job openings at <span className="text-white font-medium">8:00 AM every morning</span>. Jobs are auto-curated from LinkedIn and Internshala based on your selected domains.</span>
+                            <span>You will receive emails with fresh Indian job openings at <span className="text-white font-medium">8:00 AM every morning</span>. Jobs are auto-curated from LinkedIn and Internshala based on your profile.</span>
                           </div>
+                          {agentSubscription && (
+                            <div className="flex flex-wrap gap-2 mt-1">
+                              <div className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary">
+                                <Briefcase className="w-3 h-3" />
+                                {EXPERIENCE_LEVELS[agentSubscription.experience].icon}{' '}
+                                {EXPERIENCE_LEVELS[agentSubscription.experience].label}
+                              </div>
+                              {agentSubscription.domains.map((d) => (
+                                <div key={d} className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-surface border border-border text-text-secondary">
+                                  {d === 'tech' ? '💻 Tech / Software' : '🎨 Design / Creative'}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       ) : hasMultipleFiles ? (
                         <div className="flex flex-col gap-2">

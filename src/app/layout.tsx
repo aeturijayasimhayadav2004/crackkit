@@ -10,16 +10,22 @@ import { GuestBanner } from "@/components/GuestBanner";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "optional",
+  preload: true,
 });
 
 const syne = Syne({
   subsets: ["latin"],
   variable: "--font-syne",
+  display: "optional",
+  preload: true,
 });
 
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+  display: "optional",
+  preload: true,
 });
 
 export const metadata: Metadata = {

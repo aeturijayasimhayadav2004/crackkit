@@ -7,6 +7,7 @@ const AGENT_SLUG = 'job-alert-agent'
 
 const schema = z.object({
   domains: z.array(z.enum(['tech', 'design'])).min(1).max(2),
+  experience: z.enum(['fresher', 'junior', 'mid', 'senior']).default('fresher'),
 })
 
 export async function POST(req: Request) {
@@ -21,10 +22,10 @@ export async function POST(req: Request) {
 
   const parsed = schema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) {
-    return NextResponse.json({ error: 'Invalid domains' }, { status: 400 })
+    return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
   }
 
-  const { domains } = parsed.data
+  const { domains, experience } = parsed.data
 
   const supabaseAdmin = createAdminClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -62,6 +63,7 @@ export async function POST(req: Request) {
         user_id: user.id,
         email: user.email!,
         domains,
+        experience,
         active: true,
         updated_at: new Date().toISOString(),
       },

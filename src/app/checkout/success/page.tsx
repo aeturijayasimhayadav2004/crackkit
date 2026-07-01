@@ -6,9 +6,12 @@ import { CheckCircle } from 'lucide-react';
 import { CheckoutProgress } from '@/components/CheckoutProgress';
 import { JobAgentSetupCard } from '@/components/JobAgentSetupCard';
 import { type DomainKey } from '@/lib/job-domains';
+import { type ExperienceKey } from '@/lib/experience-levels';
+
+type AgentPrefs = { domains: DomainKey[]; experience: ExperienceKey } | null
 
 export default function CheckoutSuccessPage() {
-  const [agentDomains, setAgentDomains] = useState<DomainKey[] | null>(null);
+  const [agentPrefs, setAgentPrefs] = useState<AgentPrefs>(null);
 
   useEffect(() => {
     void import('canvas-confetti').then(({ default: confetti }) => {
@@ -19,13 +22,23 @@ export default function CheckoutSuccessPage() {
       });
     });
 
-    // Check if user purchased the job agent and has pending domain config
+    // Check if user purchased the job agent and has pending config
     try {
-      const raw = localStorage.getItem('crackkit_agent_domains');
+      // New key with domains + experience
+      const raw = localStorage.getItem('crackkit_agent_prefs');
       if (raw) {
-        const parsed = JSON.parse(raw) as DomainKey[];
+        const parsed = JSON.parse(raw) as { domains: DomainKey[]; experience: ExperienceKey };
+        if (Array.isArray(parsed.domains) && parsed.domains.length > 0) {
+          setAgentPrefs(parsed);
+          return;
+        }
+      }
+      // Fallback: legacy key with domains only
+      const legacy = localStorage.getItem('crackkit_agent_domains');
+      if (legacy) {
+        const parsed = JSON.parse(legacy) as DomainKey[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setAgentDomains(parsed);
+          setAgentPrefs({ domains: parsed, experience: 'fresher' });
         }
       }
     } catch {
@@ -80,10 +93,11 @@ export default function CheckoutSuccessPage() {
       </a>
 
       {/* Job Agent Setup — shows only when the agent was purchased */}
-      {agentDomains && (
+      {agentPrefs && (
         <JobAgentSetupCard
-          initialDomains={agentDomains}
-          onComplete={() => setAgentDomains(null)}
+          initialDomains={agentPrefs.domains}
+          initialExperience={agentPrefs.experience}
+          onComplete={() => setAgentPrefs(null)}
         />
       )}
     </div>

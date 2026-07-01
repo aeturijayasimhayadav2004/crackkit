@@ -4,15 +4,19 @@ import { useState } from 'react'
 import { Zap, CheckCircle2, Loader2, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { JobAgentDomainSelector } from '@/components/JobAgentDomainSelector'
+import { ExperienceLevelSelector } from '@/components/ExperienceLevelSelector'
 import { type DomainKey } from '@/lib/job-domains'
+import { type ExperienceKey } from '@/lib/experience-levels'
 
 interface Props {
   initialDomains: DomainKey[]
+  initialExperience: ExperienceKey
   onComplete: () => void
 }
 
-export function JobAgentSetupCard({ initialDomains, onComplete }: Props) {
+export function JobAgentSetupCard({ initialDomains, initialExperience, onComplete }: Props) {
   const [domains, setDomains] = useState<DomainKey[]>(initialDomains)
+  const [experience, setExperience] = useState<ExperienceKey>(initialExperience)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
 
@@ -22,11 +26,12 @@ export function JobAgentSetupCard({ initialDomains, onComplete }: Props) {
       const res = await fetch('/api/job-agent/activate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ domains }),
+        body: JSON.stringify({ domains, experience }),
       })
       const data = await res.json() as { error?: string }
       if (res.ok) {
         setDone(true)
+        localStorage.removeItem('crackkit_agent_prefs')
         localStorage.removeItem('crackkit_agent_domains')
         onComplete()
       } else {
@@ -45,7 +50,7 @@ export function JobAgentSetupCard({ initialDomains, onComplete }: Props) {
         <CheckCircle2 className="w-12 h-12 text-success" />
         <h3 className="text-xl font-bold text-white font-syne">Job Alert Activated!</h3>
         <p className="text-text-secondary text-sm leading-relaxed">
-          You&apos;ll receive your first job digest tomorrow morning at 8AM IST. 10 fresh Indian jobs, straight to your inbox.
+          You&apos;ll receive your first job digest tomorrow morning at 8AM IST. 10 fresh Indian jobs matched to your profile, straight to your inbox.
         </p>
       </div>
     )
@@ -60,10 +65,13 @@ export function JobAgentSetupCard({ initialDomains, onComplete }: Props) {
         <h2 className="font-bold text-white text-lg font-syne">Activate Job Alerts</h2>
       </div>
       <p className="text-text-secondary text-sm mb-6 leading-relaxed">
-        Confirm your domains below. We&apos;ll send 10 fresh Indian jobs to your inbox every morning.
+        Tell us your profile below. We&apos;ll send 10 fresh Indian jobs matched to your experience every morning.
       </p>
 
-      <JobAgentDomainSelector value={domains} onChange={setDomains} />
+      <div className="flex flex-col gap-5">
+        <JobAgentDomainSelector value={domains} onChange={setDomains} />
+        <ExperienceLevelSelector value={experience} onChange={setExperience} />
+      </div>
 
       <button
         onClick={activate}
