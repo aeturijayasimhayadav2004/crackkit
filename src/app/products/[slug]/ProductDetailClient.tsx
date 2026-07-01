@@ -126,9 +126,9 @@ export function ProductDetailClient({
               />
 
               <p className="text-text-secondary text-lg mb-6 leading-relaxed">
-                Master the core concepts with this comprehensive guide.
-                Carefully curated to help you crack your next interview and
-                upskill rapidly.
+                {isAgent
+                  ? "An AI-powered job agent that scrapes LinkedIn, Naukri & Internshala daily and sends 10 hand-picked Indian job listings straight to your inbox every morning at 8AM — filtered to your domain and experience level."
+                  : "Master the core concepts with this comprehensive guide. Carefully curated to help you crack your next interview and upskill rapidly."}
               </p>
 
               {isAgent ? (
